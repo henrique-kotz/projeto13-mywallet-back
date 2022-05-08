@@ -76,17 +76,47 @@ app.post('/', async (req, res) => {
         if (user && bcrypt.compareSync(password, user.password)) {
             const session = await db.collection('sessions').findOne({ userId: user._id });
             if (session) {
-                res.send(session.token);
+                res.send({
+                    name: user.username,
+                    token: session.token
+                });
             } else {
                 const token = uuid();
                 await db.collection('sessions').insertOne({
                     token,
                     userId: user._id
                 });
-                res.send(token);
+                res.send({
+                    name: user.username,
+                    token
+                });
             }
         } else {
             res.status(404).send('Usuário não existe!');
+        }
+    } catch(err) {
+        console.log(err);
+        res.sendStatus(500);
+    }
+});
+
+app.get('/home', async (req, res) => {
+    const { authorization } = req.headers;
+    const token = authorization?.replace('Bearer ', '');
+    if (!token) return res.sendStatus(401);
+
+    try {
+        const session = await db.collection('sessions').findOne({ token });
+        if (!session) return res.sendStatus(401);
+
+        const user = await db.collection('users').findOne({ _id: session.userId });
+        if (user) {
+            const data = await db.collection('statement')
+                .find({ user: user.username }, 
+                { projection: { _id: 0, user: 0 }}).toArray();
+            res.send(data);
+        } else {
+            res.sendStatus(401);
         }
     } catch(err) {
         console.log(err);

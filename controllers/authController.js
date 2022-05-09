@@ -1,23 +1,9 @@
 import db from '../db.js';
 import bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
-import joi from 'joi';
 
 export async function signUp(req, res) {
-    const register = req.body;
     const { username, email, password } = req.body;
-    const registerSchema = joi.object({
-        username: joi.string().alphanum().required(),
-        email: joi.string().email().required(),
-        password: joi.string().required(),
-        repeat_password: joi.ref('password')
-    });
-
-    const { error } = registerSchema.validate(register);
-    if (error || password !== register.repeat_password) {
-        res.status(422).send('Dados inválidos!');
-        return;
-    }
 
     try {
         const userCollection = db.collection('users');
@@ -42,19 +28,7 @@ export async function signUp(req, res) {
 }
 
 export async function signIn(req, res) {
-    const login = req.body;
     const { email, password } = req.body;
-
-    const loginSchema = joi.object({
-        email: joi.string().email().required(),
-        password: joi.string().required()
-    });
-
-    const { error } = loginSchema.validate(login);
-    if (error) {
-        res.status(422).send('Dados inválidos');
-        return;
-    }
 
     try {
         const user = await db.collection('users').findOne({ email });

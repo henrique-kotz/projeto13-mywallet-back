@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import joi from 'joi';
 import bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
+import dayjs from 'dayjs';
 
 const app = express();
 app.use(cors());
@@ -115,6 +116,86 @@ app.get('/home', async (req, res) => {
                 .find({ user: user.username }, 
                 { projection: { _id: 0, user: 0 }}).toArray();
             res.send(data);
+        } else {
+            res.sendStatus(401);
+        }
+    } catch(err) {
+        console.log(err);
+        res.sendStatus(500);
+    }
+});
+
+app.post('/new-income', async (req, res) => {
+    const { authorization } = req.headers;
+    const token = authorization?.replace('Bearer ', '');
+    if (!token) return res.sendStatus(401);
+
+    const { value, description } = req.body;
+    const incomeSchema = joi.object({
+        value: joi.string().pattern(/^[0-9]+,[0-9]{2}$/).required(),
+        description: joi.string().min(3).max(30).required()
+    });
+    const { error } = incomeSchema.validate(req.body);
+    if (error) {
+        res.status(422).send('Dados inválidos!');
+        return;
+    }
+    const formattedValue = value.replace(',', '.');
+
+    try {
+        const session = await db.collection('sessions').findOne({ token });
+        if (!session) return res.sendStatus(401);
+
+        const user = await db.collection('users').findOne({ _id: session.userId });
+        if (user) {
+            await db.collection('statement').insertOne({
+                user: user.username,
+                value: parseFloat(formattedValue),
+                description,
+                type: "income",
+                date: dayjs().format('DD/MM')
+            });
+            res.sendStatus(201);
+        } else {
+            res.sendStatus(401);
+        }
+    } catch(err) {
+        console.log(err);
+        res.sendStatus(500);
+    }
+});
+
+app.post('/new-expense', async (req, res) => {
+    const { authorization } = req.headers;
+    const token = authorization?.replace('Bearer ', '');
+    if (!token) return res.sendStatus(401);
+
+    const { value, description } = req.body;
+    const expenseSchema = joi.object({
+        value: joi.string().pattern(/^[0-9]+,[0-9]{2}$/).required(),
+        description: joi.string().min(3).max(30).required()
+    });
+    const { error } = expenseSchema.validate(req.body);
+    if (error) {
+        res.status(422).send('Dados inválidos!');
+        return;
+    }
+    const formattedValue = value.replace(',', '.');
+
+    try {
+        const session = await db.collection('sessions').findOne({ token });
+        if (!session) return res.sendStatus(401);
+
+        const user = await db.collection('users').findOne({ _id: session.userId });
+        if (user) {
+            await db.collection('statement').insertOne({
+                user: user.username,
+                value: parseFloat(formattedValue),
+                description,
+                type: "expense",
+                date: dayjs().format('DD/MM')
+            });
+            res.sendStatus(201);
         } else {
             res.sendStatus(401);
         }
